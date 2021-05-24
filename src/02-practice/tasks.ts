@@ -1,4 +1,4 @@
-import { Observable, of, from, fromEvent, generate, pairs, EMPTY, concat, timer, zip, range, bindCallback, bindNodeCallback, fromEventPattern, interval, NEVER, throwError, defer } from "rxjs";
+import { Observable, of, from, fromEvent, generate, pairs, EMPTY, concat, timer, zip, range, bindCallback, bindNodeCallback, fromEventPattern, interval, NEVER, throwError, defer, asyncScheduler, combineLatest } from "rxjs";
 import { map, take, tap, switchMap, filter, reduce, catchError, delay, concatMap, withLatestFrom } from "rxjs/operators";
 import { fromFetch } from "rxjs/fetch";
 import { ajax } from "rxjs/ajax";
@@ -366,7 +366,64 @@ import { addItem, run } from './../03-utils';
 
 
 
+// task from Timofei Kuznetsov
+// реализуйте бесконечное циклическое повторение элементов из массива c периудом вывода нового элемента в 3 секунды
+// используйте interval и switchMap
+(function T_Kuznetsov_task1() {
+    const items = ['item1', 'item2', 'item3'];
 
+    const stream$ = interval(3000)
+    .pipe(switchMap((v,i) => of(items[i%items.length])))
+    // run(stream$);
+})();
+
+// task from Timofei Kuznetsov
+// реализуйте бесконечное циклическое повторение элементов из массива c периудом вывода нового элемента в 3 секунды
+// используйте generate, concatMap и delay
+(function T_Kuznetsov_task2() {
+    const items = ['item1', 'item2', 'item3'];
+
+    const makeHandleProcess = (array: any[]) => ({
+        initialState: 0,
+        iterate: value => value===array.length-1 ? 0 : value + 1,
+        resultSelector: v => array[v],
+        scheduler: asyncScheduler
+    })
+    const stream$ = generate(makeHandleProcess(items))
+    .pipe(concatMap(v => of(v).pipe(delay(3000))))
+    // run(stream$);
+})();
+
+// task from Timofei Kuznetsov
+// реализуйте механизм для автоматической карусели курса валют
+//        1. Переодическое получение курсов валют с https://www.cbr-xml-daily.ru/daily_json.js с интервалом 30сек
+//        2. Бесконечное циклическое повторение курса валюты из полученного списка с интервалом 10сек
+// используйте interval, fromFetch, generate, switchMap и delay
+(function T_Kuznetsov_task3() {
+
+    const makeHandleProcess = (array: any[]) => ({
+        initialState: 0,
+        iterate: value => value===array.length-1 ? 0 : value + 1,
+        resultSelector: v => array[v],
+        scheduler: asyncScheduler
+    })
+    const stream$ = interval(10000)
+        .pipe(switchMap(
+            () => fromFetch('https://www.cbr-xml-daily.ru/daily_json.js')
+                .pipe(
+                    filter(response => response.ok),
+                    switchMap(response => response.json()),
+                    switchMap( ({Date: date, Valute: valutes}) => combineLatest([
+                        of(date),
+                        zip(
+                            generate(makeHandleProcess(Object.values(valutes))),
+                            interval(3000)
+                        )
+                    ]))
+                ))
+        )
+    // run(stream$);
+})();
 
 
 
